@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -eu
+
+if [ $# -gt 1 ]; then
+  echo "usage: $0 [run_id]"
+fi
+if [ $# -eq 1 ]; then
+  export RUN_ID="$1"
+fi
+
+cd "${BASH_SOURCE[0]%/*}"
+source ./inc.harness.sh
+
+export TOTAL_REQUESTS=100000
+export REQUESTS_PER_SEC=400
+export CONCURRENCY=4
+
+./report-baseline.sh
+./report-h1.sh
+./report-h1-via-h2.sh
+./report-h2-grpc.sh
+
+jq -s '.' ./reports/"${RUN_ID}"-*.json \
+  > "./reports/${RUN_ID}.json"
+
+if [ ! -f ./reports/report.json ]; then
+  cp "./reports/${RUN_ID}.json" ./reports/report.json
+else
+  jq 'map(select(.Labels | contains("baseline") | not))' reports/report.json >./reports/old.json
+  jq -s 'add' "./reports/${RUN_ID}.json" ./reports/old.json  > ./reports/report.json
+fi
+
