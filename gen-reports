@@ -13,13 +13,15 @@ cd "${BASH_SOURCE[0]%/*}"
 source ./inc.harness.sh
 
 export TOTAL_REQUESTS=100000
-export REQUESTS_PER_SEC=400
+export REQUESTS_PER_SEC=4000
 export CONCURRENCY=4
 
 ./report-baseline.sh
 ./report-h1.sh
+./report-h1-forward.sh
 ./report-h1-via-h2.sh
 ./report-h2-grpc.sh
+./report-h2-grpc-forward.sh
 
 jq -s '.' ./reports/"${RUN_ID}"-*.json \
   > "./reports/${RUN_ID}.json"
