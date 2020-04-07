@@ -18,10 +18,12 @@ start "$server_id" "$proxy_id" "$mock_dst_id"
 trap '{ stop "$server_id" "$proxy_id" "$mock_dst_id"; }' EXIT
 proxy_await
 
-export CLIENT_TARGET_HOST=h2-grpc-forward.test.example.com
+export CLIENT_TARGET_HOST="127.0.0.1:${PROXY_OUTBOUND_PORT}"
 
 # Warmup
 (TOTAL_REQUESTS=1 client_run_proxy_report "h2-grpc-forward" -grpc)
 
 # Run again with the proper TOTAL_REQUESTS, overwriting the first report.
 client_run_proxy_report "h2-grpc-forward" -grpc
+
+proxy_metrics > "./reports/${RUN_ID}-h2-grpc-forward.metrics"
