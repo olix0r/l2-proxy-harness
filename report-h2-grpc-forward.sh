@@ -9,6 +9,7 @@ server_id=$(server_create)
 
 export PROXY_INBOUND_ORIG_DST_PORT="$SERVER_GRPC_PORT"
 export PROXY_DST_SUFFIXES=""
+export PROXY_DST_NETWORKS=""
 proxy_id=$(proxy_create)
 
 mock_dst_id=$(mock_dst_create)
