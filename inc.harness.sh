@@ -43,7 +43,6 @@ client_run_report() {
     fortio/fortio load \
       -quiet \
       -labels "{\"run\":\"$RUN_ID\",\"kind\":\"$kind\",\"name\":\"$name\"}" \
-      -resolve localhost \
       -json "/reports/${RUN_ID}-${kind}-${name}.json" \
       -qps "$qps"  -n "$n" -c "$c" \
       "$@"
