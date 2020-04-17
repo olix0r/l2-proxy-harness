@@ -120,7 +120,7 @@ mock_dst_create() {
 ## === Control ===
 
 random_id() {
-  tr -dc a-z0-9 </dev/urandom |dd bs=5 count=1 2>/dev/null
+  LC_CTYPE=C tr -dc 'a-z0-9' </dev/urandom | head -c 5
 }
 
 if [ -z "${RUN_ID:-}" ]; then
