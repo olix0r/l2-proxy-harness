@@ -40,7 +40,7 @@ client_run_report() {
     --name="${RUN_ID}-client-${kind}-${name}" \
     --network=host \
     --volume="${dir}:/reports" \
-    fortio/fortio load \
+    "$CLIENT_IMAGE" load \
       -quiet \
       -labels "{\"run\":\"$RUN_ID\",\"kind\":\"$kind\",\"name\":\"$name\"}" \
       -json "/reports/${RUN_ID}-${kind}-${name}.json" \
@@ -56,6 +56,28 @@ client_run_proxy_report() {
     -H "Host: $CLIENT_TARGET_HOST" \
     "http://127.0.0.1:$PROXY_OUTBOUND_PORT"
 }
+
+## === Curl ===
+
+curl() {
+  docker run \
+    --rm \
+    --name="${RUN_ID}-curl" \
+    --network=host \
+    curlimages/curl "$@"
+}
+
+# Wait for the proxy to become ready
+proxy_await() {
+  docker run \
+    --rm \
+    --name="${RUN_ID}-await" \
+    --network=host \
+    --entrypoint="/bin/sh" \
+    curlimages/curl -c \
+      'while [ "$(curl -s "127.0.0.1:'"${PROXY_ADMIN_PORT}"'/ready")" != "ready" ]; do sleep 0.5 ; done'
+}
+
 
 ## === Linkerd Proxy ===
 
@@ -86,13 +108,6 @@ proxy_create() {
     --env LINKERD2_PROXY_DESTINATION_GET_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_DESTINATION_PROFILE_NETWORKS="$PROXY_DST_NETWORKS" \
     "$PROXY_IMAGE"
-}
-
-# Wait for the proxy to become ready
-proxy_await() {
-  while [ "$(curl -s "127.0.0.1:${PROXY_ADMIN_PORT}/ready")" != "ready" ]; do
-    sleep 0.5
-  done
 }
 
 # Print the proxy's metrics
