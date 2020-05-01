@@ -6,6 +6,8 @@ cd "${BASH_SOURCE[0]%/*}"
 source ./inc.harness.sh
 
 server_id=$(server_create)
+
+export PROXY_LOG=linkerd=trace,info
 proxy_id=$(proxy_create)
 
 export CLIENT_TARGET_HOST=h1-via-h2.test.example.com
@@ -26,4 +28,4 @@ curl -vso /dev/null \
     -H "Host: $CLIENT_TARGET_HOST" \
     "http://127.0.0.1:$PROXY_OUTBOUND_PORT"
 
-#docker logs "$proxy_id"
+docker logs "$proxy_id" >proxy.log
