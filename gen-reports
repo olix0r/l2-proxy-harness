@@ -26,12 +26,14 @@ done
 jq -s '.' ./reports/"${RUN_ID}"-*.json \
   > "./reports/${RUN_ID}.json"
 
-if [ ! -f ./reports/report.json ]; then
-  cp "./reports/${RUN_ID}.json" ./reports/report.json
-else
-  # Strip the baseline metrics from thec current report in order to use the new baseline.
-  jq 'map(select(.Labels | contains("baseline") | not))' reports/report.json >./reports/old.json
-  # Combine the new reports with the old reports.
-  jq -s 'add' "./reports/${RUN_ID}.json" ./reports/old.json  > ./reports/report.json
-fi
+## TODO: Move report generation/merging into another tool.
+
+# if [ ! -f ./reports/report.json ]; then
+#   cp "./reports/${RUN_ID}.json" ./reports/report.json
+# else
+#   # Strip the baseline metrics from thec current report in order to use the new baseline.
+#   jq 'map(select(.Labels | contains("baseline") | not))' reports/report.json >./reports/old.json
+#   # Combine the new reports with the old reports.
+#   jq -s 'add' "./reports/${RUN_ID}.json" ./reports/old.json  > ./reports/report.json
+# fi
 
