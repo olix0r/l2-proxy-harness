@@ -20,9 +20,10 @@ server_create() {
 ## === Fortio Client ===
 
 export CLIENT_IMAGE="${CLIENT_IMAGE:-fortio/fortio:latest}"
+export REPORTS_DIR="${REPORTS_DIR:-$PWD/target/reports}"
 
 client_run_report() {
-  local dir="${REPORTS_DIR:-$PWD/reports}"
+  local dir="${REPORTS_DIR}/${RUN_ID}"
 
   local kind="$1"
   shift
@@ -43,7 +44,7 @@ client_run_report() {
     "$CLIENT_IMAGE" load \
       -quiet \
       -labels "{\"run\":\"$RUN_ID\",\"kind\":\"$kind\",\"name\":\"$name\"}" \
-      -json "/reports/${RUN_ID}-${kind}-${name}.json" \
+      -json "/reports/${kind}-${name}.json" \
       -qps "$qps"  -n "$n" -c "$c" \
       "$@"
 }
