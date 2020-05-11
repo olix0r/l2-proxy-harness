@@ -3,7 +3,8 @@
 set -eu
 
 if [ $# -gt 1 ]; then
-  echo "usage: $0 [run_id]"
+  echo "usage: $0 [run_id]" >&2
+  exit 64
 fi
 if [ $# -eq 1 ]; then
   export RUN_ID="$1"
@@ -16,22 +17,18 @@ export TOTAL_REQUESTS=100000
 export REQUESTS_PER_SEC=4000
 export CONCURRENCY=4
 
-for sh in ./report-*.sh ; do
-  if [ -x "${sh}" ]; then
-    "$sh"
-  fi
-done
+if [ "$RUN_ID" = "baseline" ]; then
+  ./report-baseline.sh
 
-# Combine all of the individual reports into an array.
-jq -s '.' ./reports/"${RUN_ID}"-*.json \
-  > "./reports/${RUN_ID}.json"
-
-if [ ! -f ./reports/report.json ]; then
-  cp "./reports/${RUN_ID}.json" ./reports/report.json
 else
-  # Strip the baseline metrics from thec current report in order to use the new baseline.
-  jq 'map(select(.Labels | contains("baseline") | not))' reports/report.json >./reports/old.json
-  # Combine the new reports with the old reports.
-  jq -s 'add' "./reports/${RUN_ID}.json" ./reports/old.json  > ./reports/report.json
+  for sh in ./report-*.sh ; do
+    if [[ "$sh" != "./report-baseline.sh" && -x "${sh}" ]]; then
+      echo "#; ${sh}"
+      "$sh"
+    fi
+  done
 fi
 
+# Combine all of the individual reports into an array.
+jq -s '.' "$REPORTS_DIR/$RUN_ID/"*.json \
+  > "$REPORTS_DIR/$RUN_ID.json"
