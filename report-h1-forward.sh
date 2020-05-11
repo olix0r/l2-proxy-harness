@@ -23,5 +23,3 @@ curl -so /dev/null \
     "http://127.0.0.1:$PROXY_OUTBOUND_PORT"
 
 client_run_proxy_report "h1-forward"
-
-proxy_metrics > "./reports/${RUN_ID}-h1-forward.metrics"

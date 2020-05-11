@@ -11,6 +11,7 @@ export SERVER_GRPC_PORT="${SERVER_GRPC_PORT:-8124}"
 server_create() {
   docker create \
     --name="${RUN_ID}-server" \
+    --cpus="${SERVER_CPUS:-$(nproc)}" \
     --network=host \
     "${SERVER_IMAGE}" server \
       -http-port "$SERVER_HTTP_PORT" \
@@ -29,23 +30,26 @@ client_run_report() {
   shift
   local name="$1"
   shift
+  json_file="${kind}-${name}.json"
 
   mkdir -p "$dir"
 
   local qps="${REQUESTS_PER_SEC:-8}"
   local c="${CONCURRENCY:-4}"
   local n=${TOTAL_REQUESTS:-$((qps * c * 10))}
+  echo "#= $RUN_ID $kind $name RPS=$qps x=$c => $n"
 
   docker run \
     --rm \
     --name="${RUN_ID}-client-${kind}-${name}" \
     --network=host \
+    --cpus="${CLIENT_CPUS:-$(nproc)}" \
     --volume="${dir}:/reports" \
+    --user "$(id -u):$(id -g)" \
     "$CLIENT_IMAGE" load \
-      -quiet \
       -labels "{\"run\":\"$RUN_ID\",\"kind\":\"$kind\",\"name\":\"$name\"}" \
-      -json "/reports/${kind}-${name}.json" \
-      -qps "$qps"  -n "$n" -c "$c" \
+      -json "/reports/$json_file" \
+      -qps "$qps" -n "$n" -c "$c" \
       "$@"
 }
 
@@ -95,6 +99,7 @@ proxy_create() {
   docker create \
     --name="${RUN_ID}-proxy" \
     --network=host \
+    --cpus="${PROXY_CPUS:-$(nproc)}" \
     --volume="${PWD}/hosts:/etc/hosts" \
     --env LINKERD2_PROXY_LOG="${PROXY_LOG:-linkerd=info,warn}" \
     --env LINKERD2_PROXY_BUFFER_CAPACITY="${PROXY_BUFFER_CAPACITY:-10}" \
@@ -137,15 +142,6 @@ mock_dst_create() {
 
 ## === Control ===
 
-random_id() {
-  LC_CTYPE=C tr -dc 'a-z0-9' </dev/urandom | head -c 5
-}
-
-if [ -z "${RUN_ID:-}" ]; then
-  export RUN_ID
-  RUN_ID=$(random_id)
-fi
-
 # Start all specified container IDs.
 start() {
   for id in "$@" ; do
@@ -162,3 +158,13 @@ stop() {
       docker rm -f "$id" >/dev/null
     done
 }
+
+random_id() {
+  LC_CTYPE=C tr -dc 'a-z0-9' </dev/urandom | head -c 5
+}
+
+if [ -z "${RUN_ID:-}" ]; then
+  export RUN_ID
+  RUN_ID=$(random_id)
+fi
+

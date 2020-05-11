@@ -1,0 +1,72 @@
+#!/bin/bash
+
+set -eu
+
+if [ $# -gt 1 ]; then
+  echo "usage: $0 [run_id]" >&2
+  exit 64
+fi
+if [ $# -eq 1 ]; then
+  export RUN_ID="$1"
+fi
+
+cd "${BASH_SOURCE[0]%/*}"
+source ./inc.harness.sh
+
+export TOTAL_REQUESTS=100000
+export REQUESTS_PER_SEC=10000
+export SERVER_CPUS=1
+export CLIENT_CPUS=1
+export PROXY_CPUS=1
+export concurrencies="001 010 050 100 500"
+
+server_id=$(server_create)
+
+if [ "$RUN_ID" = "baseline" ]; then
+  start "$server_id"
+  trap '{ stop "$server_id"; }' EXIT
+
+  for CONCURRENCY in $concurrencies ; do
+    if [ "$RUN_ID" = "baseline" ]; then
+      client_run_report "baseline" "x${CONCURRENCY}.h1" -quiet \
+          "http://127.0.0.1:$SERVER_HTTP_PORT"
+
+      client_run_report "baseline" "x${CONCURRENCY}.h2" -grpc -quiet \
+          "127.0.0.1:$SERVER_GRPC_PORT"
+    fi
+  done
+
+else
+  GRPC_HOST="127.0.0.1:${PROXY_OUTBOUND_PORT}"
+  HTTP_HOST=h1.test.example.com
+  export MOCK_DST_ENDPOINTS="${HTTP_HOST}:80=127.0.0.1:$PROXY_INBOUND_PORT#h2;${GRPC_HOST}=127.0.0.1:$PROXY_INBOUND_PORT#h2"
+
+  export CLIENT_TARGET_HOST="127.0.0.1:${PROXY_OUTBOUND_PORT}"
+  export MOCK_DST_ENDPOINTS="${CLIENT_TARGET_HOST}=127.0.0.1:$PROXY_INBOUND_PORT#h2"
+  mock_dst_id=$(mock_dst_create)
+
+  export PROXY_DST_NETWORKS="127.0.0.1/32"
+  export PROXY_INBOUND_ORIG_DST_PORT="$SERVER_GRPC_PORT"
+  proxy_id=$(proxy_create)
+
+  start "$server_id" "$proxy_id" "$mock_dst_id"
+  trap '{ stop "$server_id" "$proxy_id" "$mock_dst_id"; }' EXIT
+  proxy_await
+
+  for CONCURRENCY in $concurrencies ; do
+    CLIENT_TARGET_HOST="${HTTP_HOST}"
+    # Warmup
+    curl -so /dev/null \
+        -H "Host: $CLIENT_TARGET_HOST" \
+        "http://127.0.0.1:$PROXY_OUTBOUND_PORT"
+    client_run_proxy_report "x${CONCURRENCY}.h1" -quiet
+
+    CLIENT_TARGET_HOST="${GRPC_HOST}"
+    (TOTAL_REQUESTS=1 client_run_proxy_report "x${CONCURRENCY}.h2" -grpc)
+    client_run_proxy_report "x${CONCURRENCY}.h2" -grpc -quiet
+  done
+fi
+
+# Combine all of the individual reports into an array.
+jq -s '.' "$REPORTS_DIR/$RUN_ID/"*.json \
+  > "$REPORTS_DIR/$RUN_ID.json"

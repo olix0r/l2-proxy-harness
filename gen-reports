@@ -17,11 +17,17 @@ export TOTAL_REQUESTS=100000
 export REQUESTS_PER_SEC=4000
 export CONCURRENCY=4
 
-for sh in ./report-*.sh ; do
-  if [ -x "${sh}" ]; then
-    "$sh"
-  fi
-done
+if [ "$RUN_ID" = "baseline" ]; then
+  ./report-baseline.sh
+
+else
+  for sh in ./report-*.sh ; do
+    if [[ "$sh" != "./report-baseline.sh" && -x "${sh}" ]]; then
+      echo "#; ${sh}"
+      "$sh"
+    fi
+  done
+fi
 
 # Combine all of the individual reports into an array.
 jq -s '.' "$REPORTS_DIR/$RUN_ID/"*.json \
