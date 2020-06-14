@@ -126,14 +126,14 @@ proxy_metrics() {
 
 ## === Mock Destination Service ===
 
-export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-olix0r/l2-mock-dst:v1}"
+export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-olix0r/l2-mock-dst:v2}"
 export MOCK_DST_PORT="${MOCK_DST_PORT:-8086}"
 
 mock_dst_create() {
   docker create \
     --name="${RUN_ID}-mock-dst" \
     --network=host \
-    --env RUST_LOG="linkerd=debug,warn" \
+    --env RUST_LOG="${MOCK_DST_LOG:-linkerd=info,warn}" \
     "$MOCK_DST_IMAGE" \
       --addr="127.0.0.1:${MOCK_DST_PORT}" \
       --endpoints="${MOCK_DST_ENDPOINTS:-}" \
