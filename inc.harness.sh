@@ -102,7 +102,6 @@ proxy_create() {
     --cpus="${PROXY_CPUS:-$(nproc)}" \
     --volume="${PWD}/hosts:/etc/hosts" \
     --env LINKERD2_PROXY_LOG="${PROXY_LOG:-linkerd=info,warn}" \
-    --env LINKERD2_PROXY_BUFFER_CAPACITY="${PROXY_BUFFER_CAPACITY:-10}" \
     --env LINKERD2_PROXY_CONTROL_LISTEN_ADDR="127.0.0.1:$PROXY_ADMIN_PORT" \
     --env LINKERD2_PROXY_IDENTITY_DISABLED=1 \
     --env LINKERD2_PROXY_INBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_INBOUND_PORT" \
