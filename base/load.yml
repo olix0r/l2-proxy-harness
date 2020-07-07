@@ -1,0 +1,73 @@
+---
+kind: ServiceAccount
+apiVersion: v1
+metadata:
+  name: load
+  namespace: linkerd-bench
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: reports
+  labels:
+    type: local
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: /var/lib/linkerd-bench
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: reports
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: load
+  namespace: linkerd-bench
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      role: load
+  template:
+    metadata:
+      labels:
+        role: load
+    spec:
+      serviceAccountName: load
+      volumes:
+        - name: reports
+          persistentVolumeClaim:
+            claimName: reports
+        - name: report-sh
+          configMap:
+            name: report-sh
+      containers:
+        - name: fortio
+          image: fortio/fortio:latest
+          resources:
+            limits:
+              cpu: 1
+          volumeMounts:
+            - mountPath: /reports
+              name: reports
+            - mountPath: /report-sh
+              name: report-sh
+          workingDir: /reports
+          command: ["/bin/bash"]
+          args: ["/report-sh/$(REPORT).sh"]
