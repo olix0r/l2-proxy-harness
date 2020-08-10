@@ -96,7 +96,8 @@ export PROXY_DST_SUFFIXES="${PROXY_DST_SUFFIXES:-test.example.com.}"
 export PROXY_DST_NETWORKS="${PROXY_DST_NETWORKS:-}"
 
 proxy_create() {
-  docker create \
+  trust_anchors=$(cat $(pwd)/identity/ca.pem)
+  image=$(docker create \
     --name="${RUN_ID}-proxy" \
     --network=host \
     --cpus="${PROXY_CPUS:-$(nproc)}" \
@@ -104,7 +105,12 @@ proxy_create() {
     --env LINKERD2_PROXY_LOG="${PROXY_LOG:-linkerd=info,warn}" \
     --env LINKERD2_PROXY_BUFFER_CAPACITY="${PROXY_BUFFER_CAPACITY:-10}" \
     --env LINKERD2_PROXY_CONTROL_LISTEN_ADDR="127.0.0.1:$PROXY_ADMIN_PORT" \
-    --env LINKERD2_PROXY_IDENTITY_DISABLED=1 \
+    --env LINKERD2_PROXY_IDENTITY_DIR="/end-entity" \
+    --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE="/token" \
+    --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS="$trust_anchors" \
+    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME="foo.ns1.serviceaccount.identity.linkerd.cluster.local" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_ADDR="127.0.0.1:$MOCK_DST_PORT" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_NAME="test-identity" \
     --env LINKERD2_PROXY_INBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_INBOUND_PORT" \
     --env LINKERD2_PROXY_INBOUND_ORIG_DST_ADDR="127.0.0.1:$PROXY_INBOUND_ORIG_DST_PORT" \
     --env LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_OUTBOUND_PORT" \
@@ -115,7 +121,10 @@ proxy_create() {
     --env LINKERD2_PROXY_DESTINATION_GET_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_DESTINATION_PROFILE_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_TAP_DISABLED=1 \
-    "$PROXY_IMAGE"
+    "$PROXY_IMAGE")
+  docker cp $(pwd)/identity/foo.ns1.serviceaccount.identity.linkerd.cluster.local/ $image:/end-entity
+  docker cp $(pwd)/identity/token.txt $image:/token
+  echo $image
 }
 
 # Print the proxy's metrics
@@ -126,18 +135,21 @@ proxy_metrics() {
 
 ## === Mock Destination Service ===
 
-export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-olix0r/l2-mock-dst:v2}"
+export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-kevinlbuoyant/linkerd2-mock-dst:mock-identity-v3}"
 export MOCK_DST_PORT="${MOCK_DST_PORT:-8086}"
 
 mock_dst_create() {
-  docker create \
+  image=$(docker create \
     --name="${RUN_ID}-mock-dst" \
     --network=host \
     --env RUST_LOG="${MOCK_DST_LOG:-linkerd=info,warn}" \
     "$MOCK_DST_IMAGE" \
       --addr="127.0.0.1:${MOCK_DST_PORT}" \
       --endpoints="${MOCK_DST_ENDPOINTS:-}" \
-      --overrides="${MOCK_DST_OVERRIDES:-}"
+      --overrides="${MOCK_DST_OVERRIDES:-}" \
+      --identities-dir="/identities")
+  docker cp $(pwd)/identity/ $image:/identities
+  echo $image
 }
 
 ## === Control ===
