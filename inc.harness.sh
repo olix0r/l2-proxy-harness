@@ -94,8 +94,24 @@ export PROXY_OUTBOUND_ORIG_DST_PORT="${PROXY_OUTBOUND_ORIG_DST_PORT:-${PROXY_INB
 export PROXY_ADMIN_PORT="${PROXY_ADMIN_PORT:-4191}"
 export PROXY_DST_SUFFIXES="${PROXY_DST_SUFFIXES:-test.example.com.}"
 export PROXY_DST_NETWORKS="${PROXY_DST_NETWORKS:-}"
+export PROXY_IDENTITY_DISABLED="${PROXY_IDENTITY_DISABLED:-}"
 
 proxy_create() {
+  # Check if proxy identity should be disabled
+  identity_env=""
+  if [ -n "${PROXY_IDENTITY_DISABLED" ]; then
+    $identity_env="--env LINKERD2_PROXY_IDENTITY_DIR=\"/end-entity\" \
+    --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE=\"/token\" \
+    --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS=\"$trust_anchors\" \
+    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME=\"foo.ns1.serviceaccount.identity.linkerd.cluster.local\" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_ADDR=\"127.0.0.1:$MOCK_DST_PORT\" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_NAME=\"test-identity\""
+  else
+    $identity_env="--env LINKERD2_PROXY_IDENTITY_DISABLED=1"
+  fi
+
+  cat "$identity_env"
+
   trust_anchors=$(cat $(pwd)/identity/ca.pem)
   image=$(docker create \
     --name="${RUN_ID}-proxy" \
@@ -105,12 +121,6 @@ proxy_create() {
     --env LINKERD2_PROXY_LOG="${PROXY_LOG:-linkerd=info,warn}" \
     --env LINKERD2_PROXY_BUFFER_CAPACITY="${PROXY_BUFFER_CAPACITY:-10}" \
     --env LINKERD2_PROXY_CONTROL_LISTEN_ADDR="127.0.0.1:$PROXY_ADMIN_PORT" \
-    --env LINKERD2_PROXY_IDENTITY_DIR="/end-entity" \
-    --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE="/token" \
-    --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS="$trust_anchors" \
-    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME="foo.ns1.serviceaccount.identity.linkerd.cluster.local" \
-    --env LINKERD2_PROXY_IDENTITY_SVC_ADDR="127.0.0.1:$MOCK_DST_PORT" \
-    --env LINKERD2_PROXY_IDENTITY_SVC_NAME="test-identity" \
     --env LINKERD2_PROXY_INBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_INBOUND_PORT" \
     --env LINKERD2_PROXY_INBOUND_ORIG_DST_ADDR="127.0.0.1:$PROXY_INBOUND_ORIG_DST_PORT" \
     --env LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_OUTBOUND_PORT" \
@@ -121,6 +131,7 @@ proxy_create() {
     --env LINKERD2_PROXY_DESTINATION_GET_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_DESTINATION_PROFILE_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_TAP_DISABLED=1 \
+    "$identity_env" \
     "$PROXY_IMAGE")
   docker cp $(pwd)/identity/foo.ns1.serviceaccount.identity.linkerd.cluster.local/ $image:/end-entity
   docker cp $(pwd)/identity/token.txt $image:/token
