@@ -97,22 +97,21 @@ export PROXY_DST_NETWORKS="${PROXY_DST_NETWORKS:-}"
 export PROXY_IDENTITY_DISABLED="${PROXY_IDENTITY_DISABLED:-}"
 
 proxy_create() {
+  trust_anchors=$(cat $(pwd)/identity/ca.pem)
+
   # Check if proxy identity should be disabled
-  identity_env=""
-  if [ -n "${PROXY_IDENTITY_DISABLED" ]; then
-    $identity_env="--env LINKERD2_PROXY_IDENTITY_DIR=\"/end-entity\" \
-    --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE=\"/token\" \
-    --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS=\"$trust_anchors\" \
-    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME=\"foo.ns1.serviceaccount.identity.linkerd.cluster.local\" \
-    --env LINKERD2_PROXY_IDENTITY_SVC_ADDR=\"127.0.0.1:$MOCK_DST_PORT\" \
-    --env LINKERD2_PROXY_IDENTITY_SVC_NAME=\"test-identity\""
+  identity_env=()
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    identity_env=(--env LINKERD2_PROXY_IDENTITY_DIR="/end-entity" \
+    --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE="/token" \
+    --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS="$trust_anchors" \
+    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME="foo.ns1.serviceaccount.identity.linkerd.cluster.local" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_ADDR="127.0.0.1:$MOCK_DST_PORT" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_NAME="test-identity")
   else
-    $identity_env="--env LINKERD2_PROXY_IDENTITY_DISABLED=1"
+    identity_env=(--env LINKERD2_PROXY_IDENTITY_DISABLED=1)
   fi
 
-  cat "$identity_env"
-
-  trust_anchors=$(cat $(pwd)/identity/ca.pem)
   image=$(docker create \
     --name="${RUN_ID}-proxy" \
     --network=host \
@@ -131,10 +130,15 @@ proxy_create() {
     --env LINKERD2_PROXY_DESTINATION_GET_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_DESTINATION_PROFILE_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_TAP_DISABLED=1 \
-    "$identity_env" \
+    "${identity_env[@]}" \
     "$PROXY_IMAGE")
-  docker cp $(pwd)/identity/foo.ns1.serviceaccount.identity.linkerd.cluster.local/ $image:/end-entity
-  docker cp $(pwd)/identity/token.txt $image:/token
+
+  # If identity is enabled, copy in the CSR, key, and token
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    docker cp $(pwd)/identity/foo.ns1.serviceaccount.identity.linkerd.cluster.local/ $image:/end-entity
+    docker cp $(pwd)/identity/token.txt $image:/token
+  fi
+
   echo $image
 }
 
@@ -150,6 +154,12 @@ export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-kevinlbuoyant/linkerd2-mock-dst:mock-id
 export MOCK_DST_PORT="${MOCK_DST_PORT:-8086}"
 
 mock_dst_create() {
+  # Check if identity args should be included
+  identity_args=()
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    identity_args=(--identities-dir="/identities")
+  fi
+
   image=$(docker create \
     --name="${RUN_ID}-mock-dst" \
     --network=host \
@@ -158,8 +168,13 @@ mock_dst_create() {
       --addr="127.0.0.1:${MOCK_DST_PORT}" \
       --endpoints="${MOCK_DST_ENDPOINTS:-}" \
       --overrides="${MOCK_DST_OVERRIDES:-}" \
-      --identities-dir="/identities")
-  docker cp $(pwd)/identity/ $image:/identities
+      ${identity_args[@]})
+  
+  # If identity is enabled, copy in the identities directory
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    docker cp $(pwd)/identity/ $image:/identities
+  fi
+
   echo $image
 }
 
