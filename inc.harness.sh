@@ -95,6 +95,7 @@ export PROXY_ADMIN_PORT="${PROXY_ADMIN_PORT:-4191}"
 export PROXY_DST_SUFFIXES="${PROXY_DST_SUFFIXES:-test.example.com.}"
 export PROXY_DST_NETWORKS="${PROXY_DST_NETWORKS:-}"
 export PROXY_IDENTITY_DISABLED="${PROXY_IDENTITY_DISABLED:-}"
+export PROXY_IDENTITY_LOCAL_NAME=${PROXY_IDENTITY_NAME:-foo.ns1.serviceaccount.identity.linkerd.cluster.local}
 
 proxy_create() {
   trust_anchors=$(cat $(pwd)/identity/ca.pem)
@@ -105,7 +106,7 @@ proxy_create() {
     identity_env=(--env LINKERD2_PROXY_IDENTITY_DIR="/end-entity" \
     --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE="/token" \
     --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS="$trust_anchors" \
-    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME="foo.ns1.serviceaccount.identity.linkerd.cluster.local" \
+    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME="$PROXY_IDENTITY_LOCAL_NAME" \
     --env LINKERD2_PROXY_IDENTITY_SVC_ADDR="127.0.0.1:$MOCK_DST_PORT" \
     --env LINKERD2_PROXY_IDENTITY_SVC_NAME="test-identity")
   else
@@ -135,7 +136,7 @@ proxy_create() {
 
   # If identity is enabled, copy in the CSR, key, and token
   if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
-    docker cp $(pwd)/identity/foo.ns1.serviceaccount.identity.linkerd.cluster.local/ $image:/end-entity
+    docker cp $(pwd)/identity/"$PROXY_IDENTITY_LOCAL_NAME"/ "$image":/end-entity
     docker cp $(pwd)/identity/token.txt $image:/token
   fi
 
