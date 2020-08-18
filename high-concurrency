@@ -18,7 +18,8 @@ export REQUESTS_PER_SEC="${REQUESTS_PER_SEC:-10000}"
 export SERVER_CPUS="${SERVER_CPUS:-1}"
 export CLIENT_CPUS="${CLIENT_CPUS:-1}"
 export PROXY_CPUS="${PROXY_CPUS:-1}"
-export CONCURRENCIES="${CONCURRENCIES:-001 010 050 100 300}"
+# export CONCURRENCIES="${CONCURRENCIES:-001 010 050 100 300}"
+export CONCURRENCIES="${CONCURRENCIES:-001}"
 
 for CONCURRENCY in $CONCURRENCIES ; do
   export CONCURRENCY
@@ -26,10 +27,10 @@ for CONCURRENCY in $CONCURRENCIES ; do
     ./high-concurrency-baseline.sh
   else
     ./high-concurrency-h1.sh
-    ./high-concurrency-h2.sh
+    # ./high-concurrency-h2.sh
   fi
 done
 
-# Combine all of the individual reports into an array.
-jq -s '.' "$REPORTS_DIR/$RUN_ID/"*.json \
-  > "$REPORTS_DIR/$RUN_ID.json"
+# # Combine all of the individual reports into an array.
+# jq -s '.' "$REPORTS_DIR/$RUN_ID/"*.json \
+#   > "$REPORTS_DIR/$RUN_ID.json"

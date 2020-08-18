@@ -151,7 +151,7 @@ proxy_metrics() {
 
 ## === Mock Destination Service ===
 
-export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-kevinlbuoyant/linkerd2-mock-dst:mock-identity-v3}"
+export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-olix0r/l2-mock-dst:v3}"
 export MOCK_DST_PORT="${MOCK_DST_PORT:-8086}"
 
 mock_dst_create() {
