@@ -94,16 +94,32 @@ export PROXY_OUTBOUND_ORIG_DST_PORT="${PROXY_OUTBOUND_ORIG_DST_PORT:-${PROXY_INB
 export PROXY_ADMIN_PORT="${PROXY_ADMIN_PORT:-4191}"
 export PROXY_DST_SUFFIXES="${PROXY_DST_SUFFIXES:-test.example.com.}"
 export PROXY_DST_NETWORKS="${PROXY_DST_NETWORKS:-}"
+export PROXY_IDENTITY_DISABLED="${PROXY_IDENTITY_DISABLED:-}"
+export PROXY_IDENTITY_LOCAL_NAME=${PROXY_IDENTITY_NAME:-foo.ns1.serviceaccount.identity.linkerd.cluster.local}
 
 proxy_create() {
-  docker create \
+  trust_anchors=$(cat $(pwd)/identity/ca.pem)
+
+  # Check if proxy identity should be disabled
+  identity_env=()
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    identity_env=(--env LINKERD2_PROXY_IDENTITY_DIR="/end-entity" \
+    --env LINKERD2_PROXY_IDENTITY_TOKEN_FILE="/token" \
+    --env LINKERD2_PROXY_IDENTITY_TRUST_ANCHORS="$trust_anchors" \
+    --env LINKERD2_PROXY_IDENTITY_LOCAL_NAME="$PROXY_IDENTITY_LOCAL_NAME" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_ADDR="127.0.0.1:$MOCK_DST_PORT" \
+    --env LINKERD2_PROXY_IDENTITY_SVC_NAME="test-identity")
+  else
+    identity_env=(--env LINKERD2_PROXY_IDENTITY_DISABLED=1)
+  fi
+
+  image=$(docker create \
     --name="${RUN_ID}-proxy" \
     --network=host \
     --cpus="${PROXY_CPUS:-$(nproc)}" \
     --volume="${PWD}/hosts:/etc/hosts" \
     --env LINKERD2_PROXY_LOG="${PROXY_LOG:-linkerd=info,warn}" \
     --env LINKERD2_PROXY_CONTROL_LISTEN_ADDR="127.0.0.1:$PROXY_ADMIN_PORT" \
-    --env LINKERD2_PROXY_IDENTITY_DISABLED=1 \
     --env LINKERD2_PROXY_INBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_INBOUND_PORT" \
     --env LINKERD2_PROXY_INBOUND_ORIG_DST_ADDR="127.0.0.1:$PROXY_INBOUND_ORIG_DST_PORT" \
     --env LINKERD2_PROXY_OUTBOUND_LISTEN_ADDR="127.0.0.1:$PROXY_OUTBOUND_PORT" \
@@ -114,7 +130,16 @@ proxy_create() {
     --env LINKERD2_PROXY_DESTINATION_GET_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_DESTINATION_PROFILE_NETWORKS="$PROXY_DST_NETWORKS" \
     --env LINKERD2_PROXY_TAP_DISABLED=1 \
-    "$PROXY_IMAGE"
+    "${identity_env[@]}" \
+    "$PROXY_IMAGE")
+
+  # If identity is enabled, copy in the CSR, key, and token
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    docker cp $(pwd)/identity/"$PROXY_IDENTITY_LOCAL_NAME"/ "$image":/end-entity
+    docker cp $(pwd)/identity/token.txt $image:/token
+  fi
+
+  echo $image
 }
 
 # Print the proxy's metrics
@@ -125,18 +150,32 @@ proxy_metrics() {
 
 ## === Mock Destination Service ===
 
-export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-olix0r/l2-mock-dst:v2}"
+export MOCK_DST_IMAGE="${MOCK_DST_IMAGE:-olix0r/l2-mock-dst:v3}"
 export MOCK_DST_PORT="${MOCK_DST_PORT:-8086}"
 
 mock_dst_create() {
-  docker create \
+  # Check if identity args should be included
+  identity_args=()
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    identity_args=(--identities-dir="/identities")
+  fi
+
+  image=$(docker create \
     --name="${RUN_ID}-mock-dst" \
     --network=host \
     --env RUST_LOG="${MOCK_DST_LOG:-linkerd=info,warn}" \
     "$MOCK_DST_IMAGE" \
       --addr="127.0.0.1:${MOCK_DST_PORT}" \
       --endpoints="${MOCK_DST_ENDPOINTS:-}" \
-      --overrides="${MOCK_DST_OVERRIDES:-}"
+      --overrides="${MOCK_DST_OVERRIDES:-}" \
+      ${identity_args[@]})
+  
+  # If identity is enabled, copy in the identities directory
+  if [ -z "${PROXY_IDENTITY_DISABLED}" ]; then
+    docker cp $(pwd)/identity/ $image:/identities
+  fi
+
+  echo $image
 }
 
 ## === Control ===

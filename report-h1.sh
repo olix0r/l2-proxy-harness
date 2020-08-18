@@ -9,7 +9,7 @@ server_id=$(server_create)
 proxy_id=$(proxy_create)
 
 export CLIENT_TARGET_HOST=h1.test.example.com
-export MOCK_DST_ENDPOINTS="${CLIENT_TARGET_HOST}:80=127.0.0.1:$PROXY_INBOUND_PORT"
+export MOCK_DST_ENDPOINTS="${CLIENT_TARGET_HOST}:80=127.0.0.1:$PROXY_INBOUND_PORT##$PROXY_IDENTITY_LOCAL_NAME"
 mock_dst_id=$(mock_dst_create)
 
 start "$server_id" "$proxy_id" "$mock_dst_id"
