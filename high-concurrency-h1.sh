@@ -2,8 +2,6 @@
 
 set -eu
 
-set -x
-
 cd "${BASH_SOURCE[0]%/*}"
 source ./inc.harness.sh
 
