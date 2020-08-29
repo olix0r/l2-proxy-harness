@@ -16,7 +16,7 @@ server_id=$(server_create)
 mock_dst_id=$(mock_dst_create)
 proxy_id=$(proxy_create)
 start "$server_id" "$proxy_id" "$mock_dst_id"
-# trap '{ stop "$server_id" "$proxy_id" "$mock_dst_id"; }' EXIT
+trap '{ stop "$server_id" "$proxy_id" "$mock_dst_id"; }' EXIT
 proxy_await
 
 CONCURRENCY="${CONCURRENCY:-1}"
@@ -25,4 +25,4 @@ CONCURRENCY="${CONCURRENCY:-1}"
 curl -so /dev/null \
     -H "Host: $CLIENT_TARGET_HOST" \
     "http://127.0.0.1:$PROXY_OUTBOUND_PORT"
-# client_run_proxy_report "x${CONCURRENCY}.h1" -quiet
+client_run_proxy_report "x${CONCURRENCY}.h1" -quiet
